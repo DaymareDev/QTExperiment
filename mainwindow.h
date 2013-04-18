@@ -31,6 +31,9 @@ private slots:
     void on_saveDescriptorButton_clicked();
 
 private:
+
+    QString descriptorFilePath;
+
     Ui::MainWindow *ui;
     QJsonDocument* descriptorsDocument;
 

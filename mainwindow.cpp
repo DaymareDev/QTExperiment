@@ -14,28 +14,39 @@
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
-    ui(new Ui::MainWindow)
+    ui(new Ui::MainWindow), descriptorFilePath("Descriptors.json")
 {
     ui->setupUi(this);
-    loadDescriptors("Descriptors.json");
+    loadDescriptors(descriptorFilePath);
     populateDescriptorsTable();
 }
 
 void MainWindow::loadDescriptors(const QString &filePath)
 {
     QFile descriptorsFile(filePath);
-    if(!descriptorsFile.open(QFileDevice::ReadWrite))
+    if(!descriptorsFile.open(QFileDevice::ReadWrite) || descriptorsFile.size() < 1)
     {
+        descriptorsDocument = new QJsonDocument(QJsonArray());
         return;
     }
     QByteArray fileData = descriptorsFile.readAll();
+
     descriptorsDocument = new QJsonDocument(QJsonDocument::fromJson(fileData));
     descriptorsFile.close();
 }
 
 void MainWindow::populateDescriptorsTable()
 {
+    if(descriptorsDocument == 0 || descriptorsDocument->isEmpty())
+        return;
 
+    QJsonArray jsonData = descriptorsDocument->array();
+
+    for(int i = 0; i < jsonData.size(); i++)
+    {
+        QJsonObject jsonObj = jsonData[i].toObject();
+        addRowToTableView(jsonObj.value("name").toString(), "deerp");
+    }
 }
 
 MainWindow::~MainWindow()
@@ -47,25 +58,6 @@ MainWindow::~MainWindow()
 
 void MainWindow::on_ButtonDocumentCreate_clicked()
 {
-    QFile toCreate("Test.json");
-    if(!toCreate.open(QFileDevice::Truncate | QFileDevice::WriteOnly))
-    { 
-        return;
-    }
-
-    QJsonObject obj;
-
-    const QJsonValue value(12);
-
-    obj.insert("DerpTest", value);
-    QJsonDocument doc(obj);
-    QByteArray binary = doc.toJson();
-    toCreate.write(binary);
-
-    toCreate.close();
-
-
-
 
 
 }
@@ -97,11 +89,41 @@ void MainWindow::addRowToTableView(const QString& value, const QString& name)
 
 }
 
-
-
 void MainWindow::on_saveDescriptorButton_clicked()
 {
+    QJsonObject descriptorObject;
+    descriptorObject.insert("Descriptor Name", (findChild<QTextEdit*>("textEditDescriptorName"))->toPlainText());
+
+    QJsonArray valueNameSpecs;
+
     QTableWidget* table = this->findChild<QTableWidget*>("tableWidget");
     QAbstractTableModel* model = dynamic_cast<QAbstractTableModel*>(table->model());
+    QModelIndex indexer;
+    for(int i = 0; i < model->rowCount(); i++)
+    {
+        float value = model->data(model->index(i,0)).toFloat();
+        QString name = model->data(model->index(i,1)).toString();
+        QJsonObject valueNameObject;
+        valueNameObject.insert("name", name);
+        valueNameObject.insert("value", QJsonValue(value));
+        valueNameSpecs.append(valueNameObject);
+    }
+    descriptorObject.insert("ValueNameSpecs", valueNameSpecs);
+    QJsonArray descriptor = descriptorsDocument->array();
+    descriptor.append(descriptorObject);
+    descriptorsDocument->setArray(descriptor);
+
+    QFile descriptorFile(descriptorFilePath);
+    if(!descriptorFile.open(QFileDevice::Truncate | QFileDevice::WriteOnly))
+    {
+        return;
+    }
+    QByteArray toWrite = descriptorsDocument->toJson();
+    QString debugSize;
+    debugSize.setNum(toWrite.size());
+    descriptorFile.write(toWrite, toWrite.size());
+    descriptorFile.close();
+
+
 
 }
